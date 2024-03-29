@@ -73,13 +73,14 @@ function deploy_chaincode() {
   local cc_folder=$(absolute_path $2)
   local temp_folder=$(mktemp -d)
   local cc_package=${temp_folder}/${cc_name}.tgz
+  local cc_image=$3
 
-  prepare_chaincode_image ${cc_folder} ${cc_name}
+  prepare_chaincode_image ${cc_folder} ${cc_image}
   package_chaincode       ${cc_name} ${cc_label} ${cc_package}
 
   if [ "${CHAINCODE_BUILDER}" == "ccaas" ]; then
     set_chaincode_id      ${cc_package}
-    launch_chaincode      ${cc_name} ${CHAINCODE_ID} ${CHAINCODE_IMAGE}
+    launch_chaincode      ${cc_name} ${CHAINCODE_ID} ${CHAINCODE_IMAGE} #CHAINCODE_ID = .tgz~, CHAINCODE_IMAGE = citacloud/asset..
   fi
 
   activate_chaincode      ${cc_name} ${cc_package}
@@ -286,11 +287,12 @@ EOF
 }
 
 function launch_chaincode_service() {
-  local org=$1
-  local peer=$2
-  local cc_name=$3
-  local cc_id=$4
-  local cc_image=$5
+  local org=$1		# org1
+  local peer=$2		# peer1 or peer2
+  local cc_name=$3	# asset
+  local cc_id=$4	# tmp/asset.tgz
+  local cc_image=$5	# citacloud/asset
+
   push_fn "Launching chaincode container \"${cc_image}\""
 
   # The chaincode endpoint needs to have the generated chaincode ID available in the environment.
@@ -310,9 +312,9 @@ function launch_chaincode_service() {
 
 function launch_chaincode() {
   local org=org1
-  local cc_name=$1
-  local cc_id=$2
-  local cc_image=$3
+  local cc_name=$1	# asset..
+  local cc_id=$2	# tmp/asset.tgz 
+  local cc_image=$3	# citacloud/asset
 
   launch_chaincode_service ${org} peer1 ${cc_name} ${cc_id} ${cc_image}
   launch_chaincode_service ${org} peer2 ${cc_name} ${cc_id} ${cc_image}
@@ -322,12 +324,14 @@ function install_chaincode_for() {
   local org=$1
   local peer=$2
   local cc_package=$3
+
   push_fn "Installing chaincode for org ${org} peer ${peer}"
 
   export_peer_context $org $peer
+  push_fn "Finish export_peer_context"
 
-  peer lifecycle chaincode install $cc_package ${INSTALL_EXTRA_ARGS}
-
+  peer lifecycle chaincode install $cc_package ${INSTALL_EXTRA_ARGS} 
+  push_fn "Finish chaincode install"
   pop_fn
 }
 
@@ -396,4 +400,3 @@ function set_chaincode_id() {
 
   CHAINCODE_ID=${cc_label}:${cc_sha256}
 }
-
